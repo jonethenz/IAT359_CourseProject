@@ -5,6 +5,7 @@ import * as Location from "expo-location";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Linking } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const RestaurantListScreen = () => {
   const route = useRoute();
@@ -20,24 +21,39 @@ const RestaurantListScreen = () => {
     if (restaurant.showReviews && restaurant.placeId) {
       const fetchReviews = async () => {
         try {
+          //Try to load cached reviews
+          const cachedReviews = await AsyncStorage.getItem(`reviews-${restaurant.placeId}`);
+          if (cachedReviews) {
+            setReviews(JSON.parse(cachedReviews)); // Use cached reviews
+            return;
+          }
+  
+          //If no cached data, fetch from Google Places API
           const apiKey = "AIzaSyBj-DzHK0Z04dPkkdTfgEqXiS4eJS-cD2o";
           const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${restaurant.placeId}&fields=reviews&key=${apiKey}`;
           const response = await fetch(url);
           const data = await response.json();
-
+  
           if (data.result && data.result.reviews) {
             setReviews(data.result.reviews);
+            await AsyncStorage.setItem(`reviews-${restaurant.placeId}`, JSON.stringify(data.result.reviews)); // Cache reviews
           } else {
             Alert.alert("No reviews found for this location.");
           }
         } catch (error) {
           console.error("Error fetching Google reviews:", error);
+  
+          //Go back to cached data if API call fails
+          const cachedReviews = await AsyncStorage.getItem(`reviews-${restaurant.placeId}`);
+          if (cachedReviews) {
+            setReviews(JSON.parse(cachedReviews));
+          }
         }
       };
-
+  
       fetchReviews();
     }
-  }, [restaurant.showReviews, restaurant.placeId]);
+  }, [restaurant.showReviews, restaurant.placeId]);  
 
   // For Fetching the User's Current Location
   useEffect(() => {
@@ -58,7 +74,7 @@ const RestaurantListScreen = () => {
     fetchUserLocation();
   }, []);
 
-  // For being able to open Google Maps with directions
+  //For being able to open Google Maps with directions
   const openMaps = () => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
       restaurant.location

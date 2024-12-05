@@ -6,6 +6,7 @@ import { db } from "./firebaseConfig";
 import Geocoder from "react-native-geocoding";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 Geocoder.init("AIzaSyBj-DzHK0Z04dPkkdTfgEqXiS4eJS-cD2o");
 
@@ -61,35 +62,41 @@ const AddRestaurantScreen = ({ navigation }) => {
     }
   };
 
-  const handleAddRestaurant = async () => {
-    if (!name.trim()) {
-      Alert.alert("Error", "Restaurant name is required.");
-      return;
-    }
-    if (!location.trim()) {
-      Alert.alert("Error", "Restaurant location is required.");
-      return;
-    }
+const handleAddRestaurant = async () => {
+  if (!name.trim()) {
+    Alert.alert("Error", "Restaurant name is required.");
+    return;
+  }
+  if (!location.trim()) {
+    Alert.alert("Error", "Restaurant location is required.");
+    return;
+  }
 
-    try {
-      await addDoc(collection(db, "restaurants"), { 
-        name,
-        notes,
-        images, 
-        location,
-        latitude,
-        longitude,
-        placeId,
-        showReviews,
-        createdAt: new Date(),
-      });
+  try {
+    const newRestaurant = {
+      name,
+      notes,
+      images,
+      location,
+      latitude,
+      longitude,
+      placeId,
+      showReviews,
+      createdAt: new Date(),
+    };
 
-      Alert.alert("Success", "Restaurant added successfully!");
-      navigation.goBack();
-    } catch (error) {
-      Alert.alert("Error", "Failed to add restaurant.");
-    }
-  };
+    //Saving to Firestore
+    const docRef = await addDoc(collection(db, "restaurants"), newRestaurant);
+
+    //To Cache locally
+    await AsyncStorage.setItem(`restaurant-${docRef.id}`, JSON.stringify(newRestaurant));
+
+    Alert.alert("Success", "Restaurant added successfully!");
+    navigation.goBack();
+  } catch (error) {
+    Alert.alert("Error", "Failed to add restaurant.");
+  }
+};
 
   const renderImageItem = ({ item }) => (
     <Image source={{ uri: item }} style={styles.image} />

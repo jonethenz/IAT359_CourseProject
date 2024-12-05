@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, Modal
 import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const HomeScreen = ({ navigation }) => {
   const [restaurants, setRestaurants] = useState([]);
@@ -11,11 +12,20 @@ const HomeScreen = ({ navigation }) => {
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "restaurants"), (snapshot) => {
-      const restaurantList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    const unsubscribe = onSnapshot(collection(db, "restaurants"), async (snapshot) => {
+      const restaurantList = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const data = { id: doc.id, ...doc.data() };
+          try {
+            //For fetching the 'showReviews' preference from AsyncStorage
+            const showReviews = await AsyncStorage.getItem(`restaurant-showReviews-${data.id}`);
+            return { ...data, showReviews: JSON.parse(showReviews) ?? data.showReviews };
+          } catch (error) {
+            console.error(`Error fetching showReviews for ${data.name}:`, error);
+            return data; //Access back to Firestore data if the AsyncStorage fails
+          }
+        })
+      );
       setRestaurants(restaurantList);
     });
 
@@ -25,6 +35,7 @@ const HomeScreen = ({ navigation }) => {
   const handleDeleteRestaurant = async (restaurantId) => {
     try {
       await deleteDoc(doc(db, "restaurants", restaurantId));
+      await AsyncStorage.removeItem(`restaurant-showReviews-${restaurantId}`); // Remove from AsyncStorage
       Alert.alert("Success", "Restaurant deleted!");
     } catch (error) {
       Alert.alert("Error", "Failed to delete restaurant.");

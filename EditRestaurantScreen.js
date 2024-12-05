@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const EditRestaurantScreen = ({ route, navigation }) => {
   const { restaurant } = route.params;
@@ -26,21 +27,36 @@ const EditRestaurantScreen = ({ route, navigation }) => {
     }
 
     try {
-      // This is for updating the restaurant details in Firestore
-      const restaurantRef = doc(db, "restaurants", restaurant.id);
-      await updateDoc(restaurantRef, {
+      const updatedRestaurant = {
         name,
         notes,
         location,
         latitude,
         longitude,
         showReviews,
-      });
+      };
+
+      //To update the Firestore
+      const restaurantRef = doc(db, "restaurants", restaurant.id);
+      await updateDoc(restaurantRef, updatedRestaurant);
+
+      //To save the 'showReviews' preference to AsyncStorage
+      await AsyncStorage.setItem(`restaurant-showReviews-${restaurant.id}`, JSON.stringify(showReviews));
 
       Alert.alert("Success", "Restaurant details updated!");
       navigation.goBack();
     } catch (error) {
       Alert.alert("Error", "Failed to update restaurant details.");
+    }
+  };
+
+  const handleToggleShowReviews = async (value) => {
+    setShowReviews(value);
+    try {
+      //To save the preference to AsyncStorage immediately after toggle
+      await AsyncStorage.setItem(`restaurant-showReviews-${restaurant.id}`, JSON.stringify(value));
+    } catch (error) {
+      console.error("Error saving showReviews preference to AsyncStorage", error);
     }
   };
 
@@ -77,7 +93,7 @@ const EditRestaurantScreen = ({ route, navigation }) => {
               setLongitude(lng);
             }}
             query={{
-              key: "AIzaSyBj-DzHK0Z04dPkkdTfgEqXiS4eJS-cD2o", 
+              key: "AIzaSyBj-DzHK0Z04dPkkdTfgEqXiS4eJS-cD2o",
               language: "en",
             }}
             styles={{
@@ -93,7 +109,7 @@ const EditRestaurantScreen = ({ route, navigation }) => {
           <Text>Show Google Reviews</Text>
           <Switch
             value={showReviews}
-            onValueChange={(value) => setShowReviews(value)}
+            onValueChange={handleToggleShowReviews}
           />
         </View>
 
